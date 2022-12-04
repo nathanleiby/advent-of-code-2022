@@ -1,18 +1,11 @@
 ﻿open System.IO
 
-// utils
-// copied from https://github.com/jack-pappas/ExtCore/blob/2adff09ca1ed6a555a8e6564203ec8dbfeeb76c8/ExtCore/Pervasive.fs#L210-L212
+// tap copied from https://github.com/jack-pappas/ExtCore/blob/2adff09ca1ed6a555a8e6564203ec8dbfeeb76c8/ExtCore/Pervasive.fs#L210-L212
 let tap (action: 'T -> unit) (value: 'T) : 'T =
     action value
     value
 
 let tee (value: 'T) = tap (fun x -> printfn "%A" x) value
-
-let splitListInHalf (list) =
-    let n = (Seq.length list) / 2
-    let firstList = list |> Seq.take n |> Seq.toList
-    let secondList = list |> Seq.skip n |> Seq.toList
-    (firstList, secondList)
 
 let boolToInt b =
     match b with
@@ -25,15 +18,18 @@ let letterScore c =
     letterVal + capitalLetterBonus + 1
 
 let processLine line =
+    line
     // split in half
-    splitListInHalf line
-    // convert to Set
-    // |> tap (fun x -> printfn "line =  %A" x)
-    |> (fun pair -> (Set.ofList (fst pair), Set.ofList (snd pair)))
+    |> Array.ofSeq
+    |> Array.splitInto 2
+    // turn into sets
+    |> Array.map Set.ofSeq
     // set intersection
-    |> (fun pair -> Set.intersect (fst pair) (snd pair))
-    |> Set.toList
-    |> (fun x -> x[0])
+    |> (fun list -> Set.intersect list[0] list[1])
+    // get the one character in the intersection
+    |> Set.toSeq
+    |> Seq.head
+    // convert to letter value
     |> letterScore
 
 
@@ -54,14 +50,11 @@ let partTwoHelper seq =
     i2 |> Set.toList |> (fun x -> x[0]) |> letterScore
 
 
-let seqToSet x = x |> Seq.toList |> Set.ofList
-
 let partTwo file =
     File.ReadAllLines(file)
     |> Array.chunkBySize 3
-    |> Seq.ofArray
     // |> tee
-    |> Seq.map (Seq.map seqToSet)
+    |> Seq.map (Seq.map Set.ofSeq)
     // |> tee
     |> Seq.map partTwoHelper
     // |> tee
