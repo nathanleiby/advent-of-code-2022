@@ -19,7 +19,6 @@ let pipelog s x =
 // Problem
 //
 
-// Part 1
 let toStr (cArr: char[]) =
     cArr
     |> Seq.map (fun x -> string x)
@@ -54,48 +53,24 @@ let parseInput input rowCount colCount =
 
     stacksList |> Array.map List.rev
 
-let parseOneInst (line: string) : (int * int * int) =
+let parseSingleInstruction (line: string) : (int * int * int) =
     line.Split(" ")
     |> Array.ofSeq
     |> (fun x -> [| x[1]; x[3]; x[5] |])
     |> Array.map int
     |> (fun x -> (x[0], x[1], x[2]))
 
-// // |> fun x -> x.Split(" ")
-// // |> Array.ofSeq
-// // |> fun x -> [| x[1]; x[3]; x[5] |]
-// // |> tee
-// // |> Array.map int
-// // |> fun x -> (x[0], x[1], x[2])
-// |> (1, 2, 1)
-
-// (1, 2, 1)
-
-let parseInstructions (input: string array) rowCount =
+let parseInstructions (input: string array) rowCount : seq<int * int * int> =
     input
     |> Seq.skip (rowCount + 2) // also skip col idxs and blank row
-    |> Seq.map parseOneInst
-
-// |> Seq.map (fun x -> x.Split(" "))
-// |> Seq.map Array.ofSeq
-// |> Seq.map (fun x -> [| x[1]; x[3]; x[5] |])
-// |> tee
-// |> Seq.map (fun x -> Array.map int)
-// // |> Seq.map Array.ofSeq
-// |> Seq.map (fun x -> (x[0], x[1], x[2]))
-// |> List.ofSeq
-// |> List.rev
-// |> Seq.ofList
-
-// let instructions = [ (1, 2, 1); (3, 1, 3); (2, 2, 1); (1, 1, 2) ]
-// instructions
+    |> Seq.map parseSingleInstruction
 
 let partOne f rowCount colCount =
+    printfn "\nRunning part one for %s...\n" f
+
     let lines = File.ReadAllLines(f)
     let stacks = parseInput lines rowCount colCount
     let instructions = parseInstructions lines rowCount
-
-    // printfn "Stacks = %A" stacks
 
     let moveHelper fromList toList =
         let h = fromList |> List.head
@@ -115,64 +90,61 @@ let partOne f rowCount colCount =
 
         stacks
 
-    // TODO: parse the instructions
     let run instructions =
         for inst in instructions do
             let count, fromId, toId = inst
 
             for _ in 1..count do
                 move fromId toId |> ignore
-    // printfn "%A"
 
-    printfn "\nRunning...\n"
-
-    // let instructions = [ (1, 2, 1); (3, 1, 3); (2, 2, 1); (1, 1, 2) ]
     run instructions
 
-    let out = stacks |> Array.map List.head |> Array.map string |> String.concat ""
-    // assert (out = "CMZ")
+    stacks |> Array.map List.head |> Array.map string |> String.concat ""
 
-    out
+let partTwo f rowCount colCount =
+    printfn "\nRunning part two for %s...\n" f
+
+    let lines = File.ReadAllLines(f)
+    let stacks = parseInput lines rowCount colCount
+    let instructions = parseInstructions lines rowCount
+
+    let moveHelper fromList toList (q: int) =
+        let front, back = List.splitAt q fromList
 
 
+        // put on top of stack
+        let newToList = List.append front toList
 
-// TODO: Seq.take controls how many lines are considered as "cargo"
-// -> maybe.. takeWhile  line != "" and omit last line with numbers
+        back, newToList
+
+    let move instruction =
+        // handle 1-indexing
+        let count, fromId, toId = instruction
+
+        let (fromNew, toNew) = moveHelper stacks[fromId - 1] stacks[toId - 1] count
+
+        stacks[fromId - 1] <- fromNew
+        stacks[toId - 1] <- toNew
+
+        stacks
+
+    let run (ii: seq<int * int * int>) =
+        for inst in ii do
+            move inst |> ignore
+
+    run instructions
+
+    stacks |> Array.map List.head |> Array.map string |> String.concat ""
 
 
-// if (idx = 0) then
-
-// initialize em do
-
-// let mutable stack = []
-// stack <- List.append s1 [ 'N' ]
-// stack <- List.append s1 [ 'Z' ]
-
-// // create the the list of stacks (whole "cargo" representati)
-// stacksList <- List.append stacksList [ s1 ]
-// stacksList <- List.append stacksList [ s2 ]
-// stacksList <- List.append stacksList [ s3 ]
-
-// let arrayFill1 = [| 1..9 |]
-// Array.fill arrayFill1 1 9 ' '
-// let parsedInput = lines |> Seq.take 3 |> List.ofSeq |> List.rev |> Seq.ofList
-// go through lines in revrse
-printfn "%A" (partOne "./example.txt" 3 3)
+// part 1
+let exampleOne = partOne "./example.txt" 3 3
+printfn "%A" exampleOne
+assert (exampleOne = "CMZ")
 printfn "%A" (partOne "./input.txt" 8 9)
 
-// printfn "%A" parsedInput
-
-// TODO:
-// - fill rows with empty
-// - transpose input (flip x-y) to create stacks
-
-// charArrToStr
-
-// let x = [| ' '; ' '; ' '; ' ' |]
-// let xs = Seq.map (fun x -> string x) x
-// let xss = String.concat "" xs
-// printfn "%A" x
-// printfn "%A" xs
-// printfn "hello: %s" xss
-// printfn "hello: %s!" xss
-// printfn "hello: %s!" (xss.Trim())
+// part 2
+let example2 = partTwo "./example.txt" 3 3
+printfn "%A" exampleOne
+assert (example2 = "MCD")
+printfn "%A" (partTwo "./input.txt" 8 9)
