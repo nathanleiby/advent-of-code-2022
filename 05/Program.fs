@@ -20,33 +20,82 @@ let pipelog s x =
 //
 
 // Part 1
-let f = "./example.txt"
-let lines = File.ReadAllLines(f)
+let toStr (cArr: char[]) =
+    cArr
+    |> Seq.map (fun x -> string x)
+    |> String.concat ""
+    |> (fun x -> x.Replace('[', ' '))
+    |> (fun x -> x.Replace(']', ' '))
+    |> (fun x -> x.Trim())
 
-// design a data structure for the stacks
+let parseLine line =
+    // line |> Seq.chunkBySize 4 |> Seq.map (fun x -> String.concat "," x)
+    let chunked = line |> Seq.chunkBySize 4
 
-// parse the initial state of the stacks
-// - figure out approach for vertical -> horizontal
+    chunked |> Seq.map toStr
 
-// parsew the instructions
-// execute the instructions on the initial state
-let example =
-    // create the stacks
-    let mutable s1 = []
-    s1 <- List.append s1 [ 'N' ]
-    s1 <- List.append s1 [ 'Z' ]
+let parseInput input rowCount colCount =
+    let parsedInput =
+        input
+        |> Seq.take rowCount
+        |> Seq.map parseLine
+        |> List.ofSeq
+        |> List.rev
+        |> Seq.ofList
 
-    let mutable s1 = [ 'N'; 'Z' ]
-    let mutable s2 = [ 'D'; 'C'; 'M' ]
-    let mutable s3 = [ 'P' ]
+    let mutable stacksList = Array.init colCount (fun x -> [])
 
-    // create the the list of stacks (whole "cargo" representati)
-    let mutable stacksList = []
-    stacksList <- List.append stacksList [ s1 ]
-    stacksList <- List.append stacksList [ s2 ]
-    stacksList <- List.append stacksList [ s3 ]
+    for row in parsedInput do
+        for (colIdx, colVal) in Seq.indexed row do
+            if not (colVal.Equals("")) then
+                let mutable stack = stacksList[colIdx]
+                stack <- List.append stack [ colVal ]
+                stacksList[colIdx] <- stack
 
-    let stacks = Array.ofList stacksList
+    stacksList |> Array.map List.rev
+
+let parseOneInst (line: string) : (int * int * int) =
+    line.Split(" ")
+    |> Array.ofSeq
+    |> (fun x -> [| x[1]; x[3]; x[5] |])
+    |> Array.map int
+    |> (fun x -> (x[0], x[1], x[2]))
+
+// // |> fun x -> x.Split(" ")
+// // |> Array.ofSeq
+// // |> fun x -> [| x[1]; x[3]; x[5] |]
+// // |> tee
+// // |> Array.map int
+// // |> fun x -> (x[0], x[1], x[2])
+// |> (1, 2, 1)
+
+// (1, 2, 1)
+
+let parseInstructions (input: string array) rowCount =
+    input
+    |> Seq.skip (rowCount + 2) // also skip col idxs and blank row
+    |> Seq.map parseOneInst
+
+// |> Seq.map (fun x -> x.Split(" "))
+// |> Seq.map Array.ofSeq
+// |> Seq.map (fun x -> [| x[1]; x[3]; x[5] |])
+// |> tee
+// |> Seq.map (fun x -> Array.map int)
+// // |> Seq.map Array.ofSeq
+// |> Seq.map (fun x -> (x[0], x[1], x[2]))
+// |> List.ofSeq
+// |> List.rev
+// |> Seq.ofList
+
+// let instructions = [ (1, 2, 1); (3, 1, 3); (2, 2, 1); (1, 1, 2) ]
+// instructions
+
+let partOne f rowCount colCount =
+    let lines = File.ReadAllLines(f)
+    let stacks = parseInput lines rowCount colCount
+    let instructions = parseInstructions lines rowCount
+
+    // printfn "Stacks = %A" stacks
 
     let moveHelper fromList toList =
         let h = fromList |> List.head
@@ -66,80 +115,30 @@ let example =
 
         stacks
 
-
+    // TODO: parse the instructions
     let run instructions =
         for inst in instructions do
             let count, fromId, toId = inst
 
             for _ in 1..count do
-                printfn "%A" (move fromId toId)
+                move fromId toId |> ignore
+    // printfn "%A"
+
+    printfn "\nRunning...\n"
+
+    // let instructions = [ (1, 2, 1); (3, 1, 3); (2, 2, 1); (1, 1, 2) ]
+    run instructions
+
+    let out = stacks |> Array.map List.head |> Array.map string |> String.concat ""
+    // assert (out = "CMZ")
+
+    out
 
 
-    let partOne =
-        printfn "\nRunning...\n"
-
-        let instructions = [ (1, 2, 1); (3, 1, 3); (2, 2, 1); (1, 1, 2) ]
-        run instructions
-
-        let out = stacks |> Array.map List.head |> Array.map string |> String.concat ""
-        printfn "%A" out
-        assert (out = "CMZ")
-
-    partOne
-
-let toStr (cArr: char[]) =
-    cArr
-    |> Seq.map (fun x -> string x)
-    |> String.concat ""
-    |> (fun x -> x.Replace('[', ' '))
-    |> (fun x -> x.Replace(']', ' '))
-    |> (fun x -> x.Trim())
-
-let parseLine line =
-    // line |> Seq.chunkBySize 4 |> Seq.map (fun x -> String.concat "," x)
-    let chunked = line |> Seq.chunkBySize 4
-
-    chunked |> Seq.map toStr
 
 // TODO: Seq.take controls how many lines are considered as "cargo"
 // -> maybe.. takeWhile  line != "" and omit last line with numbers
 
-
-let parseInput input =
-    let parsedInput =
-        input |> Seq.take 3 |> Seq.map parseLine |> List.ofSeq |> List.rev |> Seq.ofList
-
-    // let mutable s1 = [ 'N'; 'Z' ]
-    // let mutable s2 = [ 'D'; 'C'; 'M' ]
-    // let mutable s3 = [ 'P' ]
-    // let mutable stacks2 = []
-
-    printfn "%A" parsedInput
-
-    let mutable stacksList =
-        // Array.init (List.length (List.ofSeq (Seq.take 1 parsedInput))) (fun x -> [])
-        // TODO: Example only
-        Array.init 3 (fun x -> [])
-
-    printfn "Stacks List = %A" stacksList
-    // let mutable stack = []
-    // stacksList <- List.append stacksList [ stack ]
-
-    for (rowIdx, row) in Seq.indexed parsedInput do
-        for (colIdx, colVal) in Seq.indexed row do
-            // if (rowIdx = 0) then
-
-            if not (colVal.Equals("")) then
-                printfn "colIdx = %d, colVal = %s" colIdx colVal
-                let mutable stack = stacksList[colIdx]
-                stack <- List.append stack [ colVal ]
-                stacksList[colIdx] <- stack
-                printfn "stack = %A" stack
-
-            printfn "Stacks List = %A" stacksList
-
-
-    stacksList
 
 // if (idx = 0) then
 
@@ -158,10 +157,10 @@ let parseInput input =
 // Array.fill arrayFill1 1 9 ' '
 // let parsedInput = lines |> Seq.take 3 |> List.ofSeq |> List.rev |> Seq.ofList
 // go through lines in revrse
-printfn "hello"
-printfn "%A" (parseInput lines)
+printfn "%A" (partOne "./example.txt" 3 3)
+printfn "%A" (partOne "./input.txt" 8 9)
+
 // printfn "%A" parsedInput
-printfn "bye"
 
 // TODO:
 // - fill rows with empty
