@@ -14,15 +14,14 @@ let dequeue q =
     | h :: t -> (h, List.rev t)
     | [] -> failwith "Empty list"
 
-let parseMonkey (lines: seq<string>) =
-    // Each monkey has several attributes:
-    // Starting items lists your worry level for each item the monkey is currently holding in the order they will be inspected.
-    // Operation shows how your worry level changes as that monkey inspects an item. (An operation like new = old * 5 means that your worry level after the monkey inspected the item is five times whatever your worry level was before inspection.)
-    // Test shows how the monkey uses your worry level to decide where to throw an item next.
-    // If true shows what happens with an item if the Test was true.
-    // If false shows what happens with an item if the Test was false.
+type Monkey =
+    { Id: int
+      StartItems: int64 seq
+      Operation: int64 -> int64
+      ThrowTo: int64 -> int
+      Divisor: int64 }
 
-    // printfn "parseMonkey = %A" lines
+let parseMonkey (lines: seq<string>) =
     let lArray = Array.ofSeq lines
 
     // Monkey 0:
@@ -37,6 +36,31 @@ let parseMonkey (lines: seq<string>) =
     let op = lArray[2][23]
     let opVal = lArray[2][25..]
 
+    let opFunc (value: int64) =
+        // Operation shows how your worry level changes as that monkey inspects an item. (An operation like new = old * 5 means that your worry level after the monkey inspected the item is five times whatever your worry level was before inspection.)
+        let computedOpVal =
+            match opVal with
+            | "old" -> value // old value (`* old`)
+            | _ -> int opVal // some other number (`* 4`)
+
+        match op with
+        | '*' ->
+            let out = value * computedOpVal
+
+            if DEBUG_EACH_STEP then
+                printfn "    Worry level is multiplied by %s to %d." opVal out
+
+            out
+        | '+' ->
+            // printfn "%d %s %d" value "+" computedOpVal
+            let out = value + computedOpVal
+
+            if DEBUG_EACH_STEP then
+                printfn "    Worry level increases by %s to %d." opVal out
+
+            out
+        | _ -> raise (System.ArgumentException "invalid math operation")
+
     // Test: divisible by 23
     let parts = lArray[ 3 ].Split("Test: divisible by ")
     let divBy = parts[1] |> int
@@ -46,7 +70,15 @@ let parseMonkey (lines: seq<string>) =
     //     If false: throw to monkey 3
     let falseDest = (Array.ofSeq lArray[5])[30] |> fun c -> c.ToString() |> int
 
-    (monkeyId, startItems, op, opVal, divBy, trueDest, falseDest)
+    let throwFunc value =
+        let isDivBy = (int64 value) % (int64 divBy) = 0
+        if isDivBy then trueDest else falseDest
+
+    { Id = monkeyId
+      StartItems = startItems
+      Operation = opFunc
+      ThrowTo = throwFunc
+      Divisor = (int64 divBy) }
 
 let partOne f =
     let lines = File.ReadLines f
@@ -58,13 +90,11 @@ let partOne f =
     let mutable items = Array.create (Seq.length monkeys) []
 
     for idx, monkey in Seq.indexed monkeys do
-        let _, startItems, _, _, _, _, _ = monkey
-        items[idx] <- List.ofSeq startItems |> List.rev
+        items[idx] <- List.ofSeq monkey.StartItems |> List.rev
 
     let mutable inspectCounts = Array.create (Seq.length monkeys) 0
 
     // execute rounds
-    // let rounds = 1 // TODO: debugging
     let rounds = 20
 
     for round = 1 to rounds do
@@ -73,14 +103,11 @@ let partOne f =
 
         // The monkeys take turns inspecting and throwing items.
         for m in monkeys do
-            let monkeyId, _, op, opVal, divBy, trueDest, falseDest = m
+            let monkeyId = m.Id
 
             if DEBUG_EACH_STEP then
                 printfn "Monkey %d:" monkeyId
 
-            // NOTE: does a monkey ever throw to itself? if so this logic should be a `while dequeue ...` instead
-            // -> it seems like NO in the input
-            // NOTE: My queues are reversed. I don't _think_  it matters because monkeys process all their items
             for i = 1 to List.length items[monkeyId] do
                 // inspect item
                 let value, rest = dequeue items[monkeyId]
@@ -90,47 +117,13 @@ let partOne f =
 
                 inspectCounts[monkeyId] <- inspectCounts[monkeyId] + 1
 
-                // Operation shows how your worry level changes as that monkey inspects an item. (An operation like new = old * 5 means that your worry level after the monkey inspected the item is five times whatever your worry level was before inspection.)
-                let computedOpVal =
-                    match opVal with
-                    | "old" -> value // old value (`* old`)
-                    | _ -> int opVal // some other number (`* 4`)
-
-                let newValuePostOp =
-                    match op with
-                    | '*' ->
-                        let out = value * computedOpVal
-
-                        if DEBUG_EACH_STEP then
-                            printfn "    Worry level is multiplied by %s to %d." opVal out
-
-                        out
-                    | '+' ->
-                        // printfn "%d %s %d" value "+" computedOpVal
-                        let out = value + computedOpVal
-
-                        if DEBUG_EACH_STEP then
-                            printfn "    Worry level increases by %s to %d." opVal out
-
-                        out
-                    | _ -> raise (System.ArgumentException "invalid math operation")
-
+                let newValuePostOp = m.Operation value
 
                 // After each monkey inspects an item but before it tests your worry level,
                 // your relief that the monkey's inspection didn't damage the item causes your worry level to be divided by three and rounded down to the nearest integer.
                 let newValue = newValuePostOp / 3L // should already round down (floor), since item is an int
 
-                if DEBUG_EACH_STEP then
-                    printfn "    Monkey gets bored with item. Worry level is divided by 3 to %d." newValue
-
-                let isDivBy = newValue % (int64 divBy) = 0
-                let destIdx = if isDivBy then trueDest else falseDest
-
-                if DEBUG_EACH_STEP then
-                    printfn "    Current worry level is%s divisible by %d." (if not isDivBy then " not" else "") divBy
-
-                if DEBUG_EACH_STEP then
-                    printfn "    Item with worry level %d is thrown to monkey %d." newValue destIdx
+                let destIdx = m.ThrowTo newValue
 
                 items[monkeyId] <- rest // remove from current list
                 items[destIdx] <- enqueue newValue items[destIdx] // add to new list
@@ -163,12 +156,10 @@ let partTwo f =
     let monkeys = lines |> Seq.chunkBySize 7 |> Seq.map parseMonkey |> Array.ofSeq
 
     // track items; initialize from parsed input
-    let mutable items = Array.create (Seq.length monkeys) []
-
-    for idx, monkey in Seq.indexed monkeys do
-        let _, startItems, _, _, _, _, _ = monkey
-        items[idx] <- List.ofSeq startItems |> List.rev
-
+    let mutable items =
+        monkeys
+        |> Seq.map (fun m -> m.StartItems |> List.ofSeq |> List.rev)
+        |> Array.ofSeq
 
     let mutable inspectCounts = Array.create (Seq.length monkeys) 0L
 
@@ -177,17 +168,9 @@ let partTwo f =
     // I had took lookup the a "modulo congruence" / least-common multiple trick from others...
     // https://github.com/jovaneyck/advent-of-code-2022/blob/main/day%2011/part2.fsx#L82-L87
     // see linked Python blog post for explanation
-    let safeMod =
-        monkeys
-        // get the divisors
-        |> Seq.map (fun m ->
-            let _, _, _, _, divBy, _, _ = m
-            divBy)
-        |> Seq.map int64
-        |> Seq.reduce (*)
+    let safeMod = monkeys |> Seq.map (fun m -> m.Divisor) |> Seq.reduce (*)
 
     // execute rounds
-    // let rounds = 1 // TODO: debugging
     let rounds = 10_000
 
     for round = 1 to rounds do
@@ -196,7 +179,7 @@ let partTwo f =
 
         // The monkeys take turns inspecting and throwing items.
         for m in monkeys do
-            let monkeyId, _, op, opVal, divBy, trueDest, falseDest = m
+            let monkeyId = m.Id
 
             if DEBUG_EACH_STEP then
                 printfn "Monkey %d:" monkeyId
@@ -205,46 +188,12 @@ let partTwo f =
                 // inspect item
                 let value, rest = dequeue items[monkeyId]
 
-                if DEBUG_EACH_STEP then
-                    printfn "  Monkey inspects an item with a worry level of %d." value
-
                 inspectCounts[monkeyId] <- inspectCounts[monkeyId] + 1L
 
-                // Operation shows how your worry level changes as that monkey inspects an item. (An operation like new = old * 5 means that your worry level after the monkey inspected the item is five times whatever your worry level was before inspection.)
-                let computedOpVal =
-                    match opVal with
-                    | "old" -> value // old value (`* old`)
-                    | _ -> int opVal // some other number (`* 4`)
-
-                let newComputedVal =
-                    match op with
-                    | '*' ->
-                        let out = value * computedOpVal
-
-                        if DEBUG_EACH_STEP then
-                            printfn "    Worry level is multiplied by %s to %d." opVal out
-
-                        out
-                    | '+' ->
-                        // printfn "%d %s %d" value "+" computedOpVal
-                        let out = value + computedOpVal
-
-                        if DEBUG_EACH_STEP then
-                            printfn "    Worry level increases by %s to %d." opVal out
-
-                        out
-                    | _ -> raise (System.ArgumentException "invalid math operation")
-
+                let newComputedVal = m.Operation value
                 let newValue = (newComputedVal % safeMod)
 
-                let isDivBy = newValue % (int64 divBy) = 0
-                let destIdx = if isDivBy then trueDest else falseDest
-
-                if DEBUG_EACH_STEP then
-                    printfn "    Current worry level is%s divisible by %d." (if not isDivBy then " not" else "") divBy
-
-                if DEBUG_EACH_STEP then
-                    printfn "    Item with worry level %d is thrown to monkey %d." newValue destIdx
+                let destIdx = m.ThrowTo newValue
 
                 items[monkeyId] <- rest // remove from current list
                 items[destIdx] <- enqueue newValue items[destIdx] // add to new list
