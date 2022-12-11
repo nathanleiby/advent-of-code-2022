@@ -10,14 +10,22 @@ let partOne f =
     let mutable total = 0
     let mutable registerX = 1
 
+    let output = Array.create 240 "."
+
     // addx V takes two cycles to complete. After two cycles, the X register is increased by the value V. (V can be negative.)
     // noop takes one cycle to complete. It has no other effect.
 
 
     let incrCycle count =
         for i = 1 to count do
-            printfn "incrCycle"
+            // printfn "incrCycle"
             cycle <- cycle + 1
+
+            // 3-char wide sprite
+            let xPos = cycle % 40
+
+            if (xPos = registerX || xPos - 1 = registerX || xPos - 2 = registerX) then
+                output[cycle] <- "#"
 
             if
                 (cycle = 20
@@ -29,12 +37,12 @@ let partOne f =
             then
                 total <- total + (registerX * cycle)
 
-            printfn "Cycle = %d , RegisterX = %d" cycle registerX
+    // printfn "Cycle = %d , RegisterX = %d" cycle registerX
 
-    printfn "Cycle = %d , RegisterX = %d" cycle registerX
+    // printfn "Cycle = %d , RegisterX = %d" cycle registerX
 
     for l in lines do
-        printfn "Executing %s ..." l
+        // printfn "Executing %s ..." l
 
         match l with
         | "noop" -> incrCycle 1
@@ -46,6 +54,17 @@ let partOne f =
                 incrCycle 1)
 
     // printfn "Cycle = %d , RegisterX = %d" cycle registerX
+
+    // print screen
+    printfn "== SCREEN (start) =="
+
+    for y = 0 to 5 do
+        for x = 0 to 39 do
+            printf "%s" output[40 * y + x]
+
+        printf "\n"
+
+    printfn "== SCREEN (end) =="
 
     total
 
