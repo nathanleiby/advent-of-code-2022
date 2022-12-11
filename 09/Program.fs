@@ -58,40 +58,63 @@ let follow h t =
 
         (newX, newY)
 
-let partOne f =
+let printRope rope =
+    for y = 10 downto -10 do
+        for x = -10 to 10 do
+            if (rope |> Seq.exists (fun pt -> pt = (x, y))) then
+                printf "X"
+            else
+                printf "."
+
+        printfn ""
+
+let helper f ropeLength =
     let steps = parseFile f
-    let mutable h = (0, 0)
-    let mutable t = (0, 0)
+    let mutable rope = Array.create ropeLength (0, 0)
+
+    let tailIdx = (Array.length rope) - 1
 
     let mutable visited = Set.empty
-    visited <- visited.Add(t) // add starting location
-
-    // printfn "start: h = %A t = %A" h t
+    visited <- visited.Add(rope[tailIdx]) // add starting location
 
     for s in steps do
         let (direction, count) = s
 
         for i = 0 to (count - 1) do
-            h <- move h direction
-            t <- follow h t
-            // printfn "direction = %A -> h = %A t = %A" direction h t
-            visited <- visited.Add(t)
+            // printfn "direction = %A" direction
+
+            rope[0] <- move rope[0] direction
+
+            for ropeIdx = 0 to tailIdx - 1 do
+                rope[ropeIdx + 1] <- follow rope[ropeIdx] rope[ropeIdx + 1]
+
+            visited <- visited.Add(rope[tailIdx])
+
+    // printRope rope
+    // printfn ""
 
     // printfn "Visited = %A" visited
     Seq.length visited
 
+let partOne f = helper f 2
+let partTwo f = helper f 10
+
 printfn "== Part 1 =="
 let example1 = partOne "./example.txt"
-printfn "Example 1 = %d" example1
+printfn "Example= %d" example1
 assert (example1 = 13)
 
 let input1 = partOne "./input.txt"
-printfn "Input 1 = %d" input1
+printfn "Input = %d" input1
 
-// printfn "== Part 2 =="
-// let example2 = partTwo "./example.txt"
-// printfn "Example 1 = %d" example2
-// assert (example2 = 13)
+printfn "== Part 2 =="
+let example2 = partTwo "./example.txt"
+printfn "Example = %d" example2
+assert (example2 = 1)
 
-// let input2 = partTwo "./input.txt"
-// printfn "Input 1 = %d" input2
+let example2larger = partTwo "./example-larger.txt"
+printfn "Example (larger) = %d" example2larger
+assert (example2larger = 36)
+
+let input2 = partTwo "./input.txt"
+printfn "Input = %d" input2
